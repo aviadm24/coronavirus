@@ -3,7 +3,6 @@ db.sqlite3
 *.pyc
 migrations/
 .idea
-requirements.txt
 overflow/
 client-secret.json
 bigquery_client_secret.json
