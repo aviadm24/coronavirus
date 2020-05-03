@@ -1,35 +1,24 @@
 # coding=utf-8
 from django.shortcuts import render, redirect
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
 import gspread
 from pytrends.request import TrendReq
+import pandas as pd
+from google.cloud import bigquery
 from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2 import service_account
 from django.conf import settings
-from django.http.response import JsonResponse
 import os
 import json
-import urllib.parse as pr
-import re
-import clicksend_client
-from clicksend_client import SmsMessage
-from clicksend_client.rest import ApiException
-import ast
 
 pytrend = TrendReq()
 
 
 def index(request):
-    # https: // bootsnipp.com / snippets / ZXKKD
     get_spreadsheet()
     return render(request, "main.html")
 
 
 def get_spreadsheet():
-    # based on https://www.twilio.com/blog/2017/02/an-easy-way-to-read-and-write-to-a-google-spreadsheet-in-python.html
-    # read that file for how to generate the creds and how to use gspread to read and write to the spreadsheet
-
-    # use creds to create a client to interact with the Google Drive API
     scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
     try:
@@ -40,25 +29,97 @@ def get_spreadsheet():
         print(file_path)
         with open(file_path) as f:
             creds_dict = json.load(f)
-            print("creds: ", creds_dict)
-    # creds_dict = json.loads(json_creds)
     creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
     client = gspread.authorize(creds)
 
     # Find a workbook by url
-    spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
-    spreadsheet = client.open_by_url(spread_url)
-    # worksheet_list = spreadsheet.worksheets()
+
+    # real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
+    # spreadsheet = client.open_by_url(real_spread_url)
+    # sheet = spreadsheet.worksheet("Data")
+
+    test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
+    spreadsheet = client.open_by_url(test_spread_url)
     sheet = spreadsheet.worksheet("Sheet1")
 
     # Extract and print all of the values
-    # rows = sheet.get_all_records()
-    ID_COLUMN = 1
-    # STATUS_COLUMN = "A"
-    payload = sheet.col_values(ID_COLUMN)
-    print('list: ', payload)
-    sendToTrends(payload)
+    data = sheet.get_all_values()
+    headers = data.pop(0)
+    df = pd.DataFrame(data, columns=headers)
+    print(df.head())
+    panda_df = get_score_by_day(df, country='IL', duration='today 3-m')
+    print(panda_df.head())
+    panda_df.to_csv("trends.csv")
+    print("saved to csv")
+    table_id = 'corona.trends'
+
+    try:
+        panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace')
+    except:
+        bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        creds_dict = json.loads(bq_creds)
+        credentials = service_account.Credentials.from_service_account_info(creds_dict)
+        panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+        # on dev
+        # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
+        # # bq_client = bigquery.Client.from_service_account_json(bq_file_path)
+        # credentials = service_account.Credentials.from_service_account_file(bq_file_path)
+        # panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+
+
+    # Since string columns use the "object" dtype, pass in a (partial) schema
+    # to ensure the correct BigQuery data type.
+
+    # job_config = bigquery.LoadJobConfig(schema=[
+    #     bigquery.SchemaField(name="date", field_type="DATE"),
+    #     bigquery.SchemaField(name="vertical", field_type="STRING"),
+    #     bigquery.SchemaField(name="category", field_type="STRING"),
+    #     bigquery.SchemaField(name="sub_category", field_type="STRING"),
+    #     bigquery.SchemaField(name="keyword_name", field_type="STRING"),
+    #     bigquery.SchemaField(name="keyword_important", field_type="STRING"),
+    #     bigquery.SchemaField(name="search_volume", field_type="INTEGER"),
+    #     bigquery.SchemaField(name="score", field_type="INTEGER"),
+    # ])
+    # job = bq_client.load_table_from_dataframe(
+    #     df, table_id, job_config=job_config)
+    # # Wait for the load job to complete.
+    # job.result()
+    # print("Loaded {} rows into :{}.".format(job.output_rows, table_id))
+
+
+def get_score_by_day(data, country='IL', duration='today 3-m'):
+    results = []
+    data_headline = data.columns
+    print("data_headline: ", data_headline)
+    for index, row in data.iterrows():
+        # pytrend = TrendReq()
+        pytrend.build_payload(kw_list=[row[data_headline[3]]], geo=country, timeframe=duration)
+        df = pytrend.interest_over_time()
+        df = df.rename(columns={row[data_headline[3]]: 'score'})
+        if df.shape[1] == 2:
+            df['vertical'] = row[data_headline[0]]
+            df['category'] = row[data_headline[1]]
+            df['sub_category'] = row[data_headline[2]]
+            df['keyword_name'] = row[data_headline[3]]
+            df['keyword_important'] = row[data_headline[4]]
+            df['search_volume'] = row[data_headline[5]]
+            results.append(df[['vertical', 'category', 'sub_category', 'keyword_name', 'keyword_important',
+                               'search_volume', 'score']])
+    return pd.concat(results)
+
+    # file_name = 'Coronavirus - trends prediction - Data.csv'
+    # data = pd.read_csv(file_name)
+    # get_score_by_day(data)
+    #
+    # c = []
+    # a = ["aa", "bb", "cc"]
+    # b = ["dd", "ee", "ff"]
+    # c.append(a)
+    # c.append(b)
+    # data = pd.DataFrame.from_records(c, columns=["Team", "Player", "Salary"])
+    #
+    # print(data)
 
 
 def sendToTrends(payload):
