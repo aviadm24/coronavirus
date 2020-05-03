@@ -84,13 +84,50 @@ def get_spreadsheet():
     print("saved to csv")
     table_id = 'corona.trends'
 
+    # try:
+    #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace')
+    # except:
+    #     bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    #     creds_dict = json.loads(bq_creds)
+    #     credentials = service_account.Credentials.from_service_account_info(creds_dict)
+    #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+    #     # on dev
+    #     # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
+    #     #
+    #     # credentials = service_account.Credentials.from_service_account_file(bq_file_path)
+    #     # panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+
+
+    # Since string columns use the "object" dtype, pass in a (partial) schema
+    # to ensure the correct BigQuery data type.
     try:
-        panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace')
+        bq_client = bigquery.Client()
     except:
         bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         creds_dict = json.loads(bq_creds)
         credentials = service_account.Credentials.from_service_account_info(creds_dict)
-        panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+        bq_client = bigquery.Client(
+            credentials=credentials,
+            project=credentials.project_id,
+        )
+    # on dev
+    # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
+    # bq_client = bigquery.Client.from_service_account_json(bq_file_path)
+    job_config = bigquery.LoadJobConfig(schema=[
+        # bigquery.SchemaField(name="date", field_type="DATE"),
+        # bigquery.SchemaField(name="vertical", field_type="STRING"),
+        # bigquery.SchemaField(name="category", field_type="STRING"),
+        # bigquery.SchemaField(name="sub_category", field_type="STRING"),
+        # bigquery.SchemaField(name="keyword_name", field_type="STRING"),
+        # bigquery.SchemaField(name="keyword_important", field_type="STRING"),
+        # bigquery.SchemaField(name="search_volume", field_type="INTEGER"),
+        # bigquery.SchemaField(name="score", field_type="INTEGER"),
+    ])
+    job = bq_client.load_table_from_dataframe(
+        panda_df, table_id, job_config=job_config)
+    # Wait for the load job to complete.
+    job.result()
+    print("Loaded {} rows into :{}.".format(job.output_rows, table_id))
 
 
 sched = BlockingScheduler()
