@@ -25,7 +25,7 @@ SECRET_KEY = 'a7_0s_!z^+))dz9(56o4pho^(trq61vux%$1^ps1ktjv8c2)7h'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'corona-trends-bigq.herokuapp.com']
 
 
 # Application definition
