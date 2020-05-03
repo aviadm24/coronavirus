@@ -8,6 +8,8 @@ from google.oauth2 import service_account
 from django.conf import settings
 import os
 import json
+import random
+import time
 
 pytrend = TrendReq()
 
@@ -45,6 +47,9 @@ def get_score_by_day(data, country='IL', duration='today 3-m'):
             df['search_volume'] = row[data_headline[5]]
             results.append(df[['vertical', 'category', 'sub_category', 'keyword_name', 'keyword_important',
                                'search_volume', 'score']])
+        rand_stop_time = random.randint(15, 30)
+        print("stop for {} seconds".format(rand_stop_time))
+        time.sleep(rand_stop_time)
     return pd.concat(results)
 
 
