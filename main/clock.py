@@ -75,7 +75,7 @@ def get_spreadsheet():
     headers = data.pop(0)
     df = pd.DataFrame(data, columns=headers)
     print(df.head())
-    panda_df_3m, panda_df_7d = get_score_by_day(df, country='IL', duration='today 3-m')
+    panda_df_3m, panda_df_7d = get_score_by_day(df, country='IL')
     print(panda_df_7d.head())
     panda_df_7d.to_csv("trends.csv")
     print("saved to csv")
