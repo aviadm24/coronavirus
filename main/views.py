@@ -9,7 +9,7 @@ from google.oauth2 import service_account
 from django.conf import settings
 import os
 import json
-
+from datetime import datetime
 pytrend = TrendReq()
 
 
@@ -35,13 +35,13 @@ def get_spreadsheet():
 
     # Find a workbook by url
 
-    real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
-    spreadsheet = client.open_by_url(real_spread_url)
-    sheet = spreadsheet.worksheet("Data")
+    # real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
+    # spreadsheet = client.open_by_url(real_spread_url)
+    # sheet = spreadsheet.worksheet("Data")
 
-    # test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
-    # spreadsheet = client.open_by_url(test_spread_url)
-    # sheet = spreadsheet.worksheet("Sheet1")
+    test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
+    spreadsheet = client.open_by_url(test_spread_url)
+    sheet = spreadsheet.worksheet("Sheet1")
 
     # Extract and print all of the values
     data = sheet.get_all_values()
@@ -116,8 +116,9 @@ def get_score_by_day(data, country='IL', duration='today 3-m'):
             df['keyword_name'] = row[data_headline[3]]
             df['keyword_important'] = row[data_headline[4]]
             df['search_volume'] = row[data_headline[5]]
+            df['time_stamp'] = datetime.now()
             results.append(df[['vertical', 'category', 'sub_category', 'keyword_name', 'keyword_important',
-                               'search_volume', 'score']])
+                               'search_volume', 'score', 'time_stamp']])
     return pd.concat(results)
 
     # file_name = 'Coronavirus - trends prediction - Data.csv'
