@@ -10,47 +10,39 @@ import os
 import json
 import random
 import time
+from datetime import datetime, timedelta
 
 pytrend = TrendReq()
 
 
-# def sendgrid_mail():
-#     message = Mail(
-#             from_email='from_email@example.com',
-#             to_emails='aviadm24@gmail.com',
-#             subject='Server stopped working',
-#             html_content='<strong>and easy to do anywhere, even with Python</strong>')
-#     try:
-#         # sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
-#         sg = SendGridAPIClient('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')
-#         response = sg.send(message)
-#         print(response.status_code)
-#         print(response.body)
-#         print(response.headers)
-#     except Exception as e:
-#         print(e)
-def get_score_by_day(data, country='IL', duration='today 3-m'):
-    results = []
+def get_by_duration(results, row, data_headline, country, duration):
+    pytrend.build_payload(kw_list=[row[data_headline[3]]], geo=country, timeframe=duration)
+    df = pytrend.interest_over_time()
+    df = df.rename(columns={row[data_headline[3]]: 'score'})
+    if df.shape[1] == 2:
+        df['vertical'] = row[data_headline[0]]
+        df['category'] = row[data_headline[1]]
+        df['sub_category'] = row[data_headline[2]]
+        df['keyword_name'] = row[data_headline[3]]
+        df['keyword_important'] = row[data_headline[4]]
+        df['search_volume'] = row[data_headline[5]]
+        df['time_stamp'] = datetime.now() + timedelta(hours=3)
+        results.append(df[['vertical', 'category', 'sub_category', 'keyword_name', 'keyword_important',
+                           'search_volume', 'score', 'time_stamp']])
+
+
+def get_score_by_day(data, country='IL'):
+    results_3m = []
+    results_7d = []
     data_headline = data.columns
     print("data_headline: ", data_headline)
     for index, row in data.iterrows():
-        # pytrend = TrendReq()
-        pytrend.build_payload(kw_list=[row[data_headline[3]]], geo=country, timeframe=duration)
-        df = pytrend.interest_over_time()
-        df = df.rename(columns={row[data_headline[3]]: 'score'})
-        if df.shape[1] == 2:
-            df['vertical'] = row[data_headline[0]]
-            df['category'] = row[data_headline[1]]
-            df['sub_category'] = row[data_headline[2]]
-            df['keyword_name'] = row[data_headline[3]]
-            df['keyword_important'] = row[data_headline[4]]
-            df['search_volume'] = row[data_headline[5]]
-            results.append(df[['vertical', 'category', 'sub_category', 'keyword_name', 'keyword_important',
-                               'search_volume', 'score']])
+        get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
+        get_by_duration(results_7d, row, data_headline, country, duration='now 7-d')
         rand_stop_time = random.randint(15, 30)
         print("stop for {} seconds".format(rand_stop_time))
         time.sleep(rand_stop_time)
-    return pd.concat(results)
+    return pd.concat(results_3m), pd.concat(results_7d)
 
 
 def get_spreadsheet():
@@ -70,24 +62,25 @@ def get_spreadsheet():
 
     # Find a workbook by url
 
-    real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
-    spreadsheet = client.open_by_url(real_spread_url)
-    sheet = spreadsheet.worksheet("Data")
+    # real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
+    # spreadsheet = client.open_by_url(real_spread_url)
+    # sheet = spreadsheet.worksheet("Data")
 
-    # test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
-    # spreadsheet = client.open_by_url(test_spread_url)
-    # sheet = spreadsheet.worksheet("Sheet1")
+    test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
+    spreadsheet = client.open_by_url(test_spread_url)
+    sheet = spreadsheet.worksheet("Sheet1")
 
     # Extract and print all of the values
     data = sheet.get_all_values()
     headers = data.pop(0)
     df = pd.DataFrame(data, columns=headers)
     print(df.head())
-    panda_df = get_score_by_day(df, country='IL', duration='today 3-m')
-    print(panda_df.head())
-    panda_df.to_csv("trends.csv")
+    panda_df_3m, panda_df_7d = get_score_by_day(df, country='IL', duration='today 3-m')
+    print(panda_df_7d.head())
+    panda_df_7d.to_csv("trends.csv")
     print("saved to csv")
-    table_id = 'corona.trends'
+    table_id_3m = 'corona.trends3m'
+    table_id_7d = 'corona.trends7d'
 
     # try:
     #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace')
@@ -129,16 +122,22 @@ def get_spreadsheet():
         # bigquery.SchemaField(name="score", field_type="INTEGER"),
     ])
     job = bq_client.load_table_from_dataframe(
-        panda_df, table_id, job_config=job_config)
+        panda_df_3m, table_id_3m, job_config=job_config)
     # Wait for the load job to complete.
     job.result()
-    print("Loaded {} rows into :{}.".format(job.output_rows, table_id))
+    print("Loaded {} rows into :{}.".format(job.output_rows, table_id_3m))
+
+    job = bq_client.load_table_from_dataframe(
+        panda_df_7d, table_id_7d, job_config=job_config)
+    # Wait for the load job to complete.
+    job.result()
+    print("Loaded {} rows into :{}.".format(job.output_rows, table_id_7d))
 
 
 sched = BlockingScheduler()
 
 
-@sched.scheduled_job('cron', day_of_week='0-6', hour=17, minute=15)
+@sched.scheduled_job('cron', day_of_week='0-6', hour=9, minute=0)
 def timed_job():
     # print('dir: ', os.getcwd())
     # print(__file__)

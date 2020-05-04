@@ -96,6 +96,7 @@ def get_spreadsheet():
     job = bq_client.load_table_from_dataframe(
         panda_df, table_id, job_config=job_config)
     # Wait for the load job to complete.
+    # https://googleapis.dev/python/bigquery/latest/generated/google.cloud.bigquery.job.WriteDisposition.html
     job.result()
     print("Loaded {} rows into :{}.".format(job.output_rows, table_id))
 
