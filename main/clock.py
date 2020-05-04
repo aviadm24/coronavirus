@@ -62,13 +62,13 @@ def get_spreadsheet():
 
     # Find a workbook by url
 
-    # real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
-    # spreadsheet = client.open_by_url(real_spread_url)
-    # sheet = spreadsheet.worksheet("Data")
+    real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
+    spreadsheet = client.open_by_url(real_spread_url)
+    sheet = spreadsheet.worksheet("Data")
 
-    test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
-    spreadsheet = client.open_by_url(test_spread_url)
-    sheet = spreadsheet.worksheet("Sheet1")
+    # test_spread_url = "https://docs.google.com/spreadsheets/d/1wzFbaa6FE1EJOeLhsRtNfdjm1bztK2J72Kl2y76urUQ/edit#gid=0"
+    # spreadsheet = client.open_by_url(test_spread_url)
+    # sheet = spreadsheet.worksheet("Sheet1")
 
     # Extract and print all of the values
     data = sheet.get_all_values()
@@ -137,7 +137,7 @@ def get_spreadsheet():
 sched = BlockingScheduler()
 
 
-@sched.scheduled_job('cron', day_of_week='0-6', hour=9, minute=25)
+@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=0)
 def timed_job():
     # print('dir: ', os.getcwd())
     # print(__file__)
