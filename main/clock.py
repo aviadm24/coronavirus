@@ -137,7 +137,7 @@ def get_spreadsheet():
 sched = BlockingScheduler()
 
 
-@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=0)
+@sched.scheduled_job('cron', day_of_week='0-6', hour=2, minute=0)
 def timed_job():
     # print('dir: ', os.getcwd())
     # print(__file__)
