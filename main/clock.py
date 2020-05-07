@@ -42,7 +42,7 @@ def get_score_by_day(data, country='IL'):
         except:
             print("row index {} failed".format(index))
         # get_by_duration(results_7d, row, data_headline, country, duration='now 7-d')
-        rand_stop_time = random.randint(15, 30)
+        rand_stop_time = random.randint(30, 90)
         print("stop for {} seconds".format(rand_stop_time))
         time.sleep(rand_stop_time)
     return pd.concat(results_3m), pd.concat(results_7d)
