@@ -37,8 +37,11 @@ def get_score_by_day(data, country='IL'):
     data_headline = data.columns
     print("data_headline: ", data_headline)
     for index, row in data.iterrows():
-        get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
-        get_by_duration(results_7d, row, data_headline, country, duration='now 7-d')
+        try:
+            get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
+        except:
+            print("row index {} failed".format(index))
+        # get_by_duration(results_7d, row, data_headline, country, duration='now 7-d')
         rand_stop_time = random.randint(15, 30)
         print("stop for {} seconds".format(rand_stop_time))
         time.sleep(rand_stop_time)

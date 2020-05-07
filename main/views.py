@@ -10,12 +10,25 @@ from django.conf import settings
 import os
 import json
 from datetime import datetime
+import random
 pytrend = TrendReq()
 
 
 def index(request):
     get_spreadsheet()
     return render(request, "main.html")
+
+
+def getRand(minutesInADay, numberOfValues):
+    mirvach = (minutesInADay/numberOfValues)*60
+    print("mirvach: ", mirvach)
+    mirvach_floor = (minutesInADay//numberOfValues)*60
+    print("mirvach_floor: ", mirvach_floor)
+    print(mirvach - mirvach_floor)
+    rand_stop_time = random.randint(0, int(mirvach-mirvach_floor))
+    print(rand_stop_time)
+    timeToSleep = mirvach_floor + rand_stop_time
+    return timeToSleep
 
 
 def get_spreadsheet():
@@ -45,6 +58,10 @@ def get_spreadsheet():
 
     # Extract and print all of the values
     data = sheet.get_all_values()
+    numberOfValues = len(data)
+    print("length: ", numberOfValues)
+    minutesInADay = 24*60
+    sleepTime = getRand(minutesInADay, numberOfValues)
     headers = data.pop(0)
     df = pd.DataFrame(data, columns=headers)
     print(df.head())
@@ -122,18 +139,27 @@ def get_score_by_day(data, country='IL', duration='today 3-m'):
                                'search_volume', 'score', 'time_stamp']])
     return pd.concat(results)
 
-    # file_name = 'Coronavirus - trends prediction - Data.csv'
-    # data = pd.read_csv(file_name)
-    # get_score_by_day(data)
-    #
-    # c = []
-    # a = ["aa", "bb", "cc"]
-    # b = ["dd", "ee", "ff"]
-    # c.append(a)
-    # c.append(b)
-    # data = pd.DataFrame.from_records(c, columns=["Team", "Player", "Salary"])
-    #
-    # print(data)
+
+def callToPytrends(data, country='IL', duration='today 3-m'):
+    results = []
+    data_headline = data.columns
+    print("data_headline: ", data_headline)
+    for index, row in data.iterrows():
+        # pytrend = TrendReq()
+        pytrend.build_payload(kw_list=[row[data_headline[3]]], geo=country, timeframe=duration)
+        df = pytrend.interest_over_time()
+        df = df.rename(columns={row[data_headline[3]]: 'score'})
+        if df.shape[1] == 2:
+            df['vertical'] = row[data_headline[0]]
+            df['category'] = row[data_headline[1]]
+            df['sub_category'] = row[data_headline[2]]
+            df['keyword_name'] = row[data_headline[3]]
+            df['keyword_important'] = row[data_headline[4]]
+            df['search_volume'] = row[data_headline[5]]
+            df['time_stamp'] = datetime.now()
+            results.append(df[['vertical', 'category', 'sub_category', 'keyword_name', 'keyword_important',
+                               'search_volume', 'score', 'time_stamp']])
+    return pd.concat(results)
 
 
 def sendToTrends(payload):
