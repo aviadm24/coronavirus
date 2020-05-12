@@ -13,6 +13,26 @@ import time
 from datetime import datetime, timedelta
 
 pytrend = TrendReq()
+try:
+    bq_client = bigquery.Client()
+except:
+    bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    creds_dict = json.loads(bq_creds)
+    credentials = service_account.Credentials.from_service_account_info(creds_dict)
+    bq_client = bigquery.Client(
+        credentials=credentials,
+        project=credentials.project_id,
+    )
+
+
+def sendToBQ(panda_df_3m):
+    table_id_3m = 'corona.trends3m'
+    job_config = bigquery.LoadJobConfig(schema=[
+    ])
+    job = bq_client.load_table_from_dataframe(
+        panda_df_3m, table_id_3m, job_config=job_config)
+    job.result()
+    print("Loaded {} rows into :{}.".format(job.output_rows, table_id_3m))
 
 
 def get_by_duration(results, row, data_headline, country, duration):
@@ -31,21 +51,56 @@ def get_by_duration(results, row, data_headline, country, duration):
                            'search_volume', 'score', 'time_stamp']])
 
 
-def get_score_by_day(data, country='IL'):
-    results_3m = []
-    results_7d = []
+def updateSheets():
+    corona_url = ""
+    spreadsheet = client.open_by_url(corona_url)
+    # worksheet_list = spreadsheet.worksheets()
+    sheet = spreadsheet.worksheet("תגובות לטופס 1")
+
+    # Extract and print all of the values
+    # rows = sheet.get_all_records()
+    ID_COLUMN = 1
+    STATUS_COLUMN = "P"
+    list_of_ids = sheet.col_values(ID_COLUMN)
+    if id in list_of_ids:
+        id_row_number = str(list_of_ids.index(id) + 1)
+        sheet.update_acell(STATUS_COLUMN + id_row_number, status)
+
+
+def getScoreAndSend(data, country='IL'):
     data_headline = data.columns
-    print("data_headline: ", data_headline)
+    # print("data_headline: ", data_headline)
     for index, row in data.iterrows():
+        results_3m = []
         try:
             get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
         except:
             print("row index {} failed".format(index))
-        # get_by_duration(results_7d, row, data_headline, country, duration='now 7-d')
-        rand_stop_time = random.randint(30, 90)
-        print("stop for {} seconds".format(rand_stop_time))
-        time.sleep(rand_stop_time)
-    return pd.concat(results_3m), pd.concat(results_7d)
+        try:
+            results_3m_df = pd.concat(results_3m)
+            sendToBQ(results_3m_df)
+            rand_stop_time = random.randint(30, 50)
+            print("stop for {} seconds".format(rand_stop_time))
+            time.sleep(rand_stop_time)
+        except:
+            print("sending to BQ - index {} failed".format(index))
+        # updateSheets()
+
+# def get_score_by_day(data, country='IL'):
+#     results_3m = []
+#     # results_7d = []
+#     data_headline = data.columns
+#     print("data_headline: ", data_headline)
+#     for index, row in data.iterrows():
+#         try:
+#             get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
+#         except:
+#             print("row index {} failed".format(index))
+#         # get_by_duration(results_7d, row, data_headline, country, duration='now 7-d')
+#         rand_stop_time = random.randint(30, 90)
+#         print("stop for {} seconds".format(rand_stop_time))
+#         time.sleep(rand_stop_time)
+#     return pd.concat(results_3m)
 
 
 def get_spreadsheet():
@@ -78,64 +133,62 @@ def get_spreadsheet():
     headers = data.pop(0)
     df = pd.DataFrame(data, columns=headers)
     print(df.head())
-    panda_df_3m, panda_df_7d = get_score_by_day(df, country='IL')
-    print(panda_df_7d.head())
-    panda_df_7d.to_csv("trends.csv")
-    print("saved to csv")
-    table_id_3m = 'corona.trends3m'
-    table_id_7d = 'corona.trends7d'
-
+    getScoreAndSend(df, country='IL')
+    # # panda_df_7d.to_csv("trends.csv")
+    # # print("saved to csv")
+    # table_id_3m = 'corona.trends3m'
+    # # table_id_7d = 'corona.trends7d'
+    #
+    # # try:
+    # #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace')
+    # # except:
+    # #     bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    # #     creds_dict = json.loads(bq_creds)
+    # #     credentials = service_account.Credentials.from_service_account_info(creds_dict)
+    # #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+    # #     # on dev
+    # #     # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
+    # #     #
+    # #     # credentials = service_account.Credentials.from_service_account_file(bq_file_path)
+    # #     # panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
+    #
+    #
+    # # Since string columns use the "object" dtype, pass in a (partial) schema
+    # # to ensure the correct BigQuery data type.
     # try:
-    #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace')
+    #     bq_client = bigquery.Client()
     # except:
     #     bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     #     creds_dict = json.loads(bq_creds)
     #     credentials = service_account.Credentials.from_service_account_info(creds_dict)
-    #     panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
-    #     # on dev
-    #     # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
-    #     #
-    #     # credentials = service_account.Credentials.from_service_account_file(bq_file_path)
-    #     # panda_df.to_gbq(table_id, project_id="aviad-trends", if_exists='replace', credentials=credentials)
-
-
-    # Since string columns use the "object" dtype, pass in a (partial) schema
-    # to ensure the correct BigQuery data type.
-    try:
-        bq_client = bigquery.Client()
-    except:
-        bq_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        creds_dict = json.loads(bq_creds)
-        credentials = service_account.Credentials.from_service_account_info(creds_dict)
-        bq_client = bigquery.Client(
-            credentials=credentials,
-            project=credentials.project_id,
-        )
-    # on dev
-    # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
-    # bq_client = bigquery.Client.from_service_account_json(bq_file_path)
-    job_config = bigquery.LoadJobConfig(schema=[
-        # bigquery.SchemaField(name="date", field_type="DATE"),
-        # bigquery.SchemaField(name="vertical", field_type="STRING"),
-        # bigquery.SchemaField(name="category", field_type="STRING"),
-        # bigquery.SchemaField(name="sub_category", field_type="STRING"),
-        # bigquery.SchemaField(name="keyword_name", field_type="STRING"),
-        # bigquery.SchemaField(name="keyword_important", field_type="STRING"),
-        # bigquery.SchemaField(name="search_volume", field_type="INTEGER"),
-        # bigquery.SchemaField(name="score", field_type="INTEGER"),
-    ])
-    job = bq_client.load_table_from_dataframe(
-        panda_df_3m, table_id_3m, job_config=job_config)
-    # Wait for the load job to complete.
-    job.result()
-    print("Loaded {} rows into :{}.".format(job.output_rows, table_id_3m))
-
-    job = bq_client.load_table_from_dataframe(
-        panda_df_7d, table_id_7d, job_config=job_config)
-    # Wait for the load job to complete.
-    job.result()
-    print("Loaded {} rows into :{}.".format(job.output_rows, table_id_7d))
-
+    #     bq_client = bigquery.Client(
+    #         credentials=credentials,
+    #         project=credentials.project_id,
+    #     )
+    # # on dev
+    # # bq_file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "bigquery_client_secret.json")
+    # # bq_client = bigquery.Client.from_service_account_json(bq_file_path)
+    # job_config = bigquery.LoadJobConfig(schema=[
+    #     # bigquery.SchemaField(name="date", field_type="DATE"),
+    #     # bigquery.SchemaField(name="vertical", field_type="STRING"),
+    #     # bigquery.SchemaField(name="category", field_type="STRING"),
+    #     # bigquery.SchemaField(name="sub_category", field_type="STRING"),
+    #     # bigquery.SchemaField(name="keyword_name", field_type="STRING"),
+    #     # bigquery.SchemaField(name="keyword_important", field_type="STRING"),
+    #     # bigquery.SchemaField(name="search_volume", field_type="INTEGER"),
+    #     # bigquery.SchemaField(name="score", field_type="INTEGER"),
+    # ])
+    # job = bq_client.load_table_from_dataframe(
+    #     panda_df_3m, table_id_3m, job_config=job_config)
+    # # Wait for the load job to complete.
+    # job.result()
+    # print("Loaded {} rows into :{}.".format(job.output_rows, table_id_3m))
+    #
+    # # job = bq_client.load_table_from_dataframe(
+    # #     panda_df_7d, table_id_7d, job_config=job_config)
+    # # # Wait for the load job to complete.
+    # # job.result()
+    # # print("Loaded {} rows into :{}.".format(job.output_rows, table_id_7d))
 
 sched = BlockingScheduler()
 
