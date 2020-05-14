@@ -100,14 +100,14 @@ def getScoreAndSend(data, val, country='IL'):
             try:
                 get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
             except:
-                print("row index {} failed".format(row_index))
+                print("row index {} failed trends".format(row_index))
             try:
                 if results_3m != []:
                     results_3m_df = pd.concat(results_3m)
                     # print(results_3m_df.columns)
                     sendToBQ(results_3m_df)
                     rand_stop_time = random.randint(30, 50)
-                    print("stop for {} seconds".format(rand_stop_time))
+                    print("sent index {} to BQ".format(row_index))
                     time.sleep(rand_stop_time)
             except:
                 print("sending to BQ - index {} failed".format(row_index))
@@ -209,12 +209,14 @@ def get_spreadsheet():
 sched = BlockingScheduler()
 
 
-
 # @sched.scheduled_job('interval', id='trends', hours=8)
-@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=55)
+
+
+@sched.scheduled_job('cron', day_of_week='0-6', hour='0, 8, 16')
 def timed_job():
     # get_spreadsheet()
-    updateSheets(570)
+    # updateSheets(570)
+    print("starting timed job: {}".format(datetime.now()))
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet("Data")
     index_sheet = spreadsheet.worksheet(indexSheetName)
@@ -234,6 +236,7 @@ def timed_job():
     else:
         val = 0
         getScoreAndSend(df, val, country='IL')
+
 
 print("starting now")
 sched.start()
