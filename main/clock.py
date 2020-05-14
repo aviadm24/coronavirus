@@ -13,6 +13,8 @@ import time
 from datetime import datetime, timedelta
 
 pytrend = TrendReq()
+
+# google BQ auth
 try:
     bq_client = bigquery.Client()
 except:
@@ -23,6 +25,44 @@ except:
         credentials=credentials,
         project=credentials.project_id,
     )
+
+# google sheets auth
+scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+try:
+    json_creds = os.getenv("GOOGLE_SHEETS_CREDS_JSON")
+    creds_dict = json.loads(json_creds)
+except:
+    file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "client-secret.json")
+    with open(file_path) as f:
+        creds_dict = json.load(f)
+creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+client = gspread.authorize(creds)
+
+real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
+indexSheetName = 'Index'
+
+
+def updateSheets(row_index):
+    spreadsheet = client.open_by_url(real_spread_url)
+    sheet = spreadsheet.worksheet(indexSheetName)
+    sheet.update_acell("A1", str(row_index))
+    today = datetime.today().strftime('%Y-%m-%d')
+    sheet.update_acell("B1", today)
+
+
+def readIndex(sheet):
+    try:
+        val = sheet.get('A1')[0][0]
+        print("a1 val: ", val)
+        date = sheet.get('B1')[0][0]
+        print("date: ", date)
+        current_date = datetime.strptime(date, '%Y-%m-%d').date()
+    except:
+        val = None
+        current_date = None
+        print("didn't find date")
+    return val, current_date
 
 
 def sendToBQ(panda_df_3m):
@@ -51,40 +91,31 @@ def get_by_duration(results, row, data_headline, country, duration):
                            'search_volume', 'score', 'time_stamp']])
 
 
-def updateSheets():
-    corona_url = ""
-    spreadsheet = client.open_by_url(corona_url)
-    # worksheet_list = spreadsheet.worksheets()
-    sheet = spreadsheet.worksheet("תגובות לטופס 1")
-
-    # Extract and print all of the values
-    # rows = sheet.get_all_records()
-    ID_COLUMN = 1
-    STATUS_COLUMN = "P"
-    list_of_ids = sheet.col_values(ID_COLUMN)
-    if id in list_of_ids:
-        id_row_number = str(list_of_ids.index(id) + 1)
-        sheet.update_acell(STATUS_COLUMN + id_row_number, status)
-
-
-def getScoreAndSend(data, country='IL'):
+def getScoreAndSend(data, val, country='IL'):
     data_headline = data.columns
     # print("data_headline: ", data_headline)
-    for index, row in data.iterrows():
-        results_3m = []
-        try:
-            get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
-        except:
-            print("row index {} failed".format(index))
-        try:
-            results_3m_df = pd.concat(results_3m)
-            sendToBQ(results_3m_df)
-            rand_stop_time = random.randint(30, 50)
-            print("stop for {} seconds".format(rand_stop_time))
-            time.sleep(rand_stop_time)
-        except:
-            print("sending to BQ - index {} failed".format(index))
-        # updateSheets()
+    for row_index, row in data.iterrows():
+        if row_index >= val:
+            results_3m = []
+            try:
+                get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
+            except:
+                print("row index {} failed".format(row_index))
+            try:
+                if results_3m != []:
+                    results_3m_df = pd.concat(results_3m)
+                    # print(results_3m_df.columns)
+                    sendToBQ(results_3m_df)
+                    rand_stop_time = random.randint(30, 50)
+                    print("stop for {} seconds".format(rand_stop_time))
+                    time.sleep(rand_stop_time)
+            except:
+                print("sending to BQ - index {} failed".format(row_index))
+            try:
+                updateSheets(row_index+1)  # adding 1 so it gets the next id in the next run
+            except:
+                print("cant update google sheets")
+
 
 # def get_score_by_day(data, country='IL'):
 #     results_3m = []
@@ -104,23 +135,6 @@ def getScoreAndSend(data, country='IL'):
 
 
 def get_spreadsheet():
-    scopes = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
-    try:
-        json_creds = os.getenv("GOOGLE_SHEETS_CREDS_JSON")
-        creds_dict = json.loads(json_creds)
-    except:
-        file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "client-secret.json")
-        print(file_path)
-        with open(file_path) as f:
-            creds_dict = json.load(f)
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
-    client = gspread.authorize(creds)
-
-    # Find a workbook by url
-
-    real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet("Data")
 
@@ -130,10 +144,12 @@ def get_spreadsheet():
 
     # Extract and print all of the values
     data = sheet.get_all_values()
+    numberOfValues = len(data)
     headers = data.pop(0)
     df = pd.DataFrame(data, columns=headers)
-    print(df.head())
-    getScoreAndSend(df, country='IL')
+    # print(df.head())
+    val = 0
+    getScoreAndSend(df, val, country='IL')
     # # panda_df_7d.to_csv("trends.csv")
     # # print("saved to csv")
     # table_id_3m = 'corona.trends3m'
@@ -193,13 +209,29 @@ def get_spreadsheet():
 sched = BlockingScheduler()
 
 
-@sched.scheduled_job('cron', day_of_week='0-6', hour=2, minute=0)
+# @sched.scheduled_job('cron', day_of_week='0-6', hour=2, minute=0)
+@sched.scheduled_job('interval', id='trends', hours=8)
 def timed_job():
-    # print('dir: ', os.getcwd())
-    # print(__file__)
-    # print(os.listdir(os.getcwd()))
-    get_spreadsheet()
-    # print('Time is: ', time)
+    # get_spreadsheet()
+    spreadsheet = client.open_by_url(real_spread_url)
+    sheet = spreadsheet.worksheet("Data")
+    index_sheet = spreadsheet.worksheet(indexSheetName)
+    data = sheet.get_all_values()
+    numberOfValues = len(data)
+    headers = data.pop(0)
+    df = pd.DataFrame(data, columns=headers)
+    # print(df.head())
+    val, sheets_date = readIndex(index_sheet)
+    now_date = datetime.today().date()
+    if now_date == sheets_date:
+        val = int(val)
+        if numberOfValues > val:
+            getScoreAndSend(df, val, country='IL')
+        else:
+            print("finished all rows")
+    else:
+        val = 570
+        getScoreAndSend(df, val, country='IL')
 
 
 sched.start()

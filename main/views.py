@@ -69,25 +69,26 @@ def get_by_duration(results, row, data_headline, country, duration):
                            'search_volume', 'score', 'time_stamp']])
 
 
-def updateSheets(index):
+def updateSheets(row_index):
     spreadsheet = client.open_by_url(test_spread_url)
     sheet = spreadsheet.worksheet("Sheet2")
-    sheet.update_acell("A1", index)
+    sheet.update_acell("A1", str(row_index))
     today = datetime.today().strftime('%Y-%m-%d')
     sheet.update_acell("B1", today)
 
 
-def readIndex():
-    spreadsheet = client.open_by_url(test_spread_url)
-    sheet = spreadsheet.worksheet("Sheet2")
-    val = sheet.get('A1')[0][0]
-    print("a1 val: ", val)
+def readIndex(index_sheet):
+    # spreadsheet = client.open_by_url(test_spread_url)
+    # sheet = spreadsheet.worksheet("Sheet2")
     try:
-        date = sheet.get('B1')[0][0]
+        val = index_sheet.get('A1')[0][0]
+        print("a1 val: ", val)
+        date = index_sheet.get('B1')[0][0]
         print("date: ", date)
         current_date = datetime.strptime(date, '%Y-%m-%d').date()
     except:
-        current_date = 0
+        val = None
+        current_date = None
         print("didn't find date")
     return val, current_date
 
@@ -95,13 +96,15 @@ def readIndex():
 def getScoreAndSend(data, val, country='IL'):
     data_headline = data.columns
     print("data_headline: ", data_headline)
-    for index, row in data.iterrows():
-        if index > val:
+    for row_index, row in data.iterrows():
+        if row_index == 0:
+            print('row 0: ', row)
+        if row_index > val:
             results_3m = []
             try:
                 get_by_duration(results_3m, row, data_headline, country, duration='today 3-m')
             except:
-                print("row index {} failed".format(index))
+                print("row index {} failed".format(row_index))
             try:
                 results_3m_df = pd.concat(results_3m)
                 print(results_3m_df.columns)
@@ -110,8 +113,8 @@ def getScoreAndSend(data, val, country='IL'):
                 print("stop for {} seconds".format(rand_stop_time))
                 time.sleep(rand_stop_time)
             except:
-                print("sending to BQ - index {} failed".format(index))
-            updateSheets(index)
+                print("sending to BQ - index {} failed".format(row_index))
+            updateSheets(row_index)
 
 
 def getRand(minutesInADay, numberOfValues):
@@ -133,6 +136,7 @@ def get_spreadsheet():
 
     spreadsheet = client.open_by_url(test_spread_url)
     sheet = spreadsheet.worksheet("Sheet1")
+    index_sheet = spreadsheet.worksheet("Sheet2")
 
     # Extract and print all of the values
     data = sheet.get_all_values()
@@ -141,15 +145,17 @@ def get_spreadsheet():
     headers = data.pop(0)
     df = pd.DataFrame(data, columns=headers)
     print(df.head())
-    val, sheets_date = readIndex()
+    val, sheets_date = readIndex(index_sheet)
     now_date = datetime.today().date()
     if now_date == sheets_date:
+        val = int(val)
         if numberOfValues > val:
             getScoreAndSend(df, val, country='IL')
         else:
-            pass
+            print("finished all rows")
     else:
-        updateSheets(index)
+        row_index = 0
+        updateSheets(row_index)
 
 
     # minutesInADay = 24*60
