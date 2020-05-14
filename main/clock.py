@@ -209,10 +209,12 @@ def get_spreadsheet():
 sched = BlockingScheduler()
 
 
-# @sched.scheduled_job('cron', day_of_week='0-6', hour=2, minute=0)
-@sched.scheduled_job('interval', id='trends', hours=8)
+
+# @sched.scheduled_job('interval', id='trends', hours=8)
+@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=33)
 def timed_job():
     # get_spreadsheet()
+    updateSheets(0)
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet("Data")
     index_sheet = spreadsheet.worksheet(indexSheetName)
@@ -233,5 +235,5 @@ def timed_job():
         val = 570
         getScoreAndSend(df, val, country='IL')
 
-
+print("starting now")
 sched.start()
