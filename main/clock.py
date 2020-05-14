@@ -211,7 +211,7 @@ sched = BlockingScheduler()
 
 
 # @sched.scheduled_job('interval', id='trends', hours=8)
-@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=33)
+@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=39)
 def timed_job():
     # get_spreadsheet()
     updateSheets(0)
