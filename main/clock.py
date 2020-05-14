@@ -211,10 +211,10 @@ sched = BlockingScheduler()
 
 
 # @sched.scheduled_job('interval', id='trends', hours=8)
-@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=39)
+@sched.scheduled_job('cron', day_of_week='0-6', hour=10, minute=55)
 def timed_job():
     # get_spreadsheet()
-    updateSheets(0)
+    updateSheets(570)
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet("Data")
     index_sheet = spreadsheet.worksheet(indexSheetName)
@@ -232,7 +232,7 @@ def timed_job():
         else:
             print("finished all rows")
     else:
-        val = 570
+        val = 0
         getScoreAndSend(df, val, country='IL')
 
 print("starting now")
