@@ -35,15 +35,16 @@ except:
     file_path = os.path.join(os.path.dirname(settings.BASE_DIR), "client-secret.json")
     with open(file_path) as f:
         creds_dict = json.load(f)
-creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
-client = gspread.authorize(creds)
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
+
 
 real_spread_url = 'https://docs.google.com/spreadsheets/d/1XFwPIiSq3k3FFksQ63dBZ_4gSfZOmGIVtBGbzSttkDI/edit?ts=5eabd9c9#gid=0'
 indexSheetName = 'Index'
 
 
 def updateSheets(row_index):
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+    client = gspread.authorize(creds)
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet(indexSheetName)
     sheet.update_acell("A1", str(row_index))
@@ -135,6 +136,8 @@ def getScoreAndSend(data, val, country='IL'):
 
 
 def get_spreadsheet():
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+    client = gspread.authorize(creds)
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet("Data")
 
@@ -217,6 +220,8 @@ def timed_job():
     # get_spreadsheet()
     # updateSheets(570)
     print("starting timed job: {}".format(datetime.now()))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scopes)
+    client = gspread.authorize(creds)
     spreadsheet = client.open_by_url(real_spread_url)
     sheet = spreadsheet.worksheet("Data")
     index_sheet = spreadsheet.worksheet(indexSheetName)
