@@ -5,7 +5,7 @@ certifi==2019.11.28
 chardet==3.0.4
 clicksend-client @ git+https://github.com/ClickSend/clicksend-python.git@52baa3aebf70e4f39209fffbb16fe3199bf3b928
 dj-database-url==0.5.0
-Django==3.0.4
+Django==3.1.6
 django-extensions==2.2.9
 google-api-core==1.17.0
 google-auth==1.14.1
